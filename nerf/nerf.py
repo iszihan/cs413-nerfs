@@ -6,12 +6,13 @@ class NerfModel(nn.Module):
     def __init__(self):
         super(NerfModel, self).__init__()
 
-        # Kinjal 
+        # Sue
         # self.mlp = self.build_network() 
 
     def build_network(self):
+        # Sue
         return None 
     
     def forward(self, x):
-        
+        # Sue
 
