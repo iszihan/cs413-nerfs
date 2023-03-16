@@ -8,6 +8,7 @@ from common.rays import get_rays
 import os 
 import json 
 import imageio
+import torch
 import numpy as np 
 class NerfDataset():
     def __init__(self, dataset='blender', mode='train'):
@@ -57,4 +58,4 @@ class NerfDataset():
         return len(self.imgs[self.mode])
 
     def __getitem__(self, i):
-        return self.rays_rgb[self.mode][i] #[3, h, w, 3]
+        return torch.from_numpy(self.rays_rgb[self.mode][i]).float() #[3: rayo + rayd + rgb, h, w, 3] 
