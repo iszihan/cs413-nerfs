@@ -15,7 +15,8 @@ def sample_coarse(rays, n, perturb=False):
         zs = lower_zs + (upper_zs - lower_zs) * t_rand
     
     pts = rays[:,:,None, :3] + rays[:,:,None,3:6] * zs[:,:,:,None]
-    return pts.reshape(-1,n,3)#[h,w,n_samples,3]
+    views = rays[:,:,None,3:6].repeat(1,1,10,1)
+    return torch.cat([pts.reshape(-1,n,3), views.reshape(-1,n,3)],dim=-1) #[h,w,n_samples,6]
     
 def sample_fine(self):
     pts = None 

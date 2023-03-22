@@ -1,17 +1,33 @@
 from data.dataset import NerfDataset
 from common.util import toNP
-
 import torch 
+from torch.utils.data import DataLoader
 from nerf.hierarchical_sampler import sample_coarse
+from nerf.nerf import NerfModel
+
+# Construct dataset 
 train_dataset = NerfDataset(dataset='blender', mode='test')
 
-rays_rgb = train_dataset.__getitem__(1)
-rays = rays_rgb[:2]
-rays = rays.permute(1,2,0,3).reshape(rays.shape[1],rays.shape[2],6) # h, w, 6
-rays = torch.cat([rays, torch.tensor([train_dataset.near]).expand(rays.shape[0], rays.shape[1],1), 
-                        torch.tensor([train_dataset.far]).expand(rays.shape[0], rays.shape[1],1)], dim=-1)
+# Construct dataloader for coarse training 
+train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
-coarse_pts = sample_coarse(rays, 10) #h,w,n,3
+# Construct nerf model 
+model = NerfModel(use_viewdirs=True)
+
+# Train 
+rays_per_image = next(iter(train_dataloader))
+coarse_input = sample_coarse(rays_per_image.squeeze(), 10) #h*w,n,6
+
+# Batchify rays 
+batch_size = 800
+for i in range(0,coarse_input.shape[0],batch_size):
+    batched_input = coarse_input[i:i+batch_size]
+    output = model(batched_input) #nb, 10, 6
+    #Kinjal: render rays 
+
+
+
+
 
 
 

@@ -58,4 +58,11 @@ class NerfDataset():
         return len(self.imgs[self.mode])
 
     def __getitem__(self, i):
-        return torch.from_numpy(self.rays_rgb[self.mode][i]).float() #[3: rayo + rayd + rgb, h, w, 3] 
+        rays_rgb = torch.from_numpy(self.rays_rgb[self.mode][i]).float()
+        raysod = rays_rgb[:2]
+        raysod = raysod.permute(1,2,0,3).reshape(raysod.shape[1],raysod.shape[2],6) # h, w, 6
+        # add near and far planes 
+        rays = torch.cat([raysod, 
+                          torch.tensor([self.near]).expand(raysod.shape[0], raysod.shape[1],1), 
+                          torch.tensor([self.far]).expand(raysod.shape[0], raysod.shape[1],1)], dim=-1) #h, w, 8 (rayo + rayd + nf)
+        return rays
