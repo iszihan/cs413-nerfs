@@ -18,11 +18,11 @@ model = NerfModel(use_viewdirs=True)
 rays_per_image = next(iter(train_dataloader))
 coarse_input = sample_coarse(rays_per_image.squeeze(), 10) #h*w,n,6
 
-# Batchify rays 
+# Batchify rays per image / or across images [TODO maybe]
 batch_size = 800
 for i in range(0,coarse_input.shape[0],batch_size):
     batched_input = coarse_input[i:i+batch_size]
-    output = model(batched_input) #nb, 10, 6
+    output = model(batched_input) #nb, 10, 4 [rgb + alpha]
     #Kinjal: render rays 
 
 
