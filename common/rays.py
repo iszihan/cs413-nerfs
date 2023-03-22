@@ -20,4 +20,10 @@ def get_rays(h,w,K,p,imgs):
     rays_rgb = np.concatenate([rays, imgs[:,None,:,:,:3]],1)
     return rays_rgb
 
-# Kinjal
+
+def get_coord(origin, direction, t):
+    '''
+    Get coordinate for a given ray at parametric distance t.
+    '''
+    return origin + direction * t
+
