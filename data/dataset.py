@@ -3,6 +3,7 @@
     Selena.
     common/utils.py or common/rays.py will have the transformation
 """
+
 from common.util import spherical_poses
 from common.rays import get_rays
 import os 
@@ -16,7 +17,7 @@ class NerfDataset():
         self.dataset = dataset 
         if dataset=='blender':
             # referencing https://github.com/yenchenlin/nerf-pytorch/blob/223fe62d87d641e2bb0fb5bdbbcb6dad5efb2af3/run_nerf.py
-            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./dataset/nerf_synthetic/lego')        
+            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./data/nerf_synthetic/lego')
             # self.poses: 100,4,4
             # Construct Intrinsic 
             self.K = np.array([
@@ -26,7 +27,7 @@ class NerfDataset():
             self.near = 2
             self.far = 6
         
-        self.rays_rgb = {k: get_rays(self.h, self.w, self.K, self.poses[k], self.imgs[k]) for k in self.imgs}
+        # self.rays_rgb = {k: get_rays(self.h, self.w, self.K, self.poses[k], self.imgs[k]) for k in self.imgs}
 
     def get_blender_dataset(self, basedir):
         data = {}
@@ -57,12 +58,11 @@ class NerfDataset():
     def __len__(self):
         return len(self.imgs[self.mode])
 
+    def getConstants(self):
+        return self.h, self.w, self.f, self.near, self.far
+
     def __getitem__(self, i):
-        rays_rgb = torch.from_numpy(self.rays_rgb[self.mode][i]).float()
-        raysod = rays_rgb[:2]
-        raysod = raysod.permute(1,2,0,3).reshape(raysod.shape[1],raysod.shape[2],6) # h, w, 6
-        # add near and far planes 
-        rays = torch.cat([raysod, 
-                          torch.tensor([self.near]).expand(raysod.shape[0], raysod.shape[1],1), 
-                          torch.tensor([self.far]).expand(raysod.shape[0], raysod.shape[1],1)], dim=-1) #h, w, 8 (rayo + rayd + nf)
-        return rays
+        rays_rgb = get_rays(self.h, self.w, self.K, self.poses[self.mode][i:i + 1], self.imgs[self.mode][i:i + 1])
+        rays_rgb = torch.tensor(rays_rgb.squeeze(0))
+        rays_rgb = rays_rgb.permute(1,2,0,3).reshape(rays_rgb.shape[1],rays_rgb.shape[2],9) # h, w, 9 (rayo + rayd + rgb)
+        return rays_rgb

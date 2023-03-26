@@ -38,7 +38,6 @@ class NerfModel(nn.Module):
         # Sue
         '''
         @input:
-        x: [nb,n,6]
         '''
         input_pts, input_views = torch.split(x, [self.input_ch, self.input_ch_views], dim = -1)
         h = input_pts

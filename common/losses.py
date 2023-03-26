@@ -1,5 +1,7 @@
 import torch
 
+def loss_mse(pred, target):
+    return torch.mean((pred[:, :, :3] - target)**2)
 def rendering_loss(data_imgs, pred_course, pred_fine):
     """
     data_imgs, pred_course, pred_fine: [b, h, w, 3]
