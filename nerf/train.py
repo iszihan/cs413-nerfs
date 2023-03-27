@@ -1,0 +1,55 @@
+
+import tensorboardX
+import os 
+from common.vol_rendering import volumetric_rendering_per_image as render_image
+from common.vol_rendering import volumetric_rendering_per_ray as render_ray
+import numpy as np
+import torch 
+from common.util import writable_image
+
+def eval():
+    return None
+
+def train_one_epoch(loader, model, optimizer, opt):
+
+    for i, img in enumerate(loader):
+        # batchify rays 
+        n_rays = img.shape[0] * img.shape[1] * img.shape[2] 
+        ray_indices = np.array(range(n_rays))
+        np.random.shuffle(ray_indices)
+        n_batches = n_rays // opt.batch_rays
+        for i_batch in range(n_batches):
+            optimizer.zero_grad()
+            opt.global_step += 1
+            batch_indices = ray_indices[i_batch * opt.batch_rays : (i_batch + 1) * opt.batch_rays]
+            batch_indices = np.unravel_index(batch_indices, (img.shape[0], img.shape[1], img.shape[2]))
+            batch_indices = np.stack(batch_indices, axis=1)
+            batch_rays = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], :6]
+            batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:]
+            batch_pred = render_ray(model, opt.near, opt.far, 10, batch_rays) #nb,4
+            loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
+            print(loss)
+            opt.writer.add_scalar('loss', loss, opt.global_step)
+            loss.backward()
+            optimizer.step()
+        
+            if i_batch % 1 == 0:
+                # save image
+                rays = img[:1, :, :, :6]
+                pred = render_image(model, opt.near, opt.far, 10, rays)[0]
+                #pred = torch.round(255*pred).clip(0,255).to(torch.uint8)
+                opt.writer.add_image(writable_image(pred), opt.global_step)
+                exit()
+            
+
+def train(train_dataloader, model, optimizer, opt):
+    model.train()
+    # set up logging 
+    opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
+    opt.global_step = 0
+    for i_epoch in range(opt.epoch):
+        train_one_epoch(train_dataloader, model, optimizer, opt)
+        save_checkpoint(model, optimizer, opt, i_epoch)
+    
+def save_checkpoint():
+    return None

@@ -3,8 +3,18 @@ import torch
 import nerf.nerf as nerf
 import common.rays as rays_module
 
+def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None):
+    """"
+    @input:
+    rays: [nr, 6]
+    @return:
+    imgs: [b, h, w, 3]
+    """
+    cam_rays = rays.reshape(rays.shape[0], 2, 3)
+    rgba = expected_colour(model, cam_rays, t_n, t_f, n_samples)
+    return rgba
 
-def volumetric_rendering(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None):
+def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None):
     """
     h, w: image height and width
     focal: focal length
@@ -27,7 +37,7 @@ def volumetric_rendering(model, t_n, t_f, n_samples=10, rays=None, h=None, w=Non
     # get expected colour for each ray for each camera
     for cam in range(cam_rays.shape[0]):
         # get rays for each camera
-        cam_rays_i = cam_rays[cam]                      # [h, w, 2, 3]
+        cam_rays_i = cam_rays[cam] # [h, w, 2, 3]
         # get expected colour for each ray
         rgba = expected_colour(model, cam_rays_i.reshape(-1, 2, 3), t_n, t_f, n_samples)
         # assign colour to image
@@ -56,11 +66,11 @@ def expected_colour(model, rays, t_n, t_f, n_samples):
     accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density, dim=0))
     weights = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
     colour_pred = torch.sum(((weights * accumulated_transmittance)[:, None].repeat(1, 3) * rgb).reshape(rays.shape[0], n_samples, 3), dim=1)
-    print(colour_pred.shape)
+    #print(colour_pred.shape)
     alpha = accumulated_transmittance.reshape(rays.shape[0], n_samples)[:, -1].reshape(rays.shape[0], 1)
-    print(alpha.shape)
+    #print(alpha.shape)
     output = torch.cat([colour_pred, alpha], dim = 1)
-    print(output.shape)
+    #print(output.shape)
     return output
 
 
