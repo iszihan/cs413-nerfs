@@ -25,8 +25,8 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_indices = np.unravel_index(batch_indices, (img.shape[0], img.shape[1], img.shape[2]))
             batch_indices = np.stack(batch_indices, axis=1)
             batch_rays = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], :6].to(opt.device)
-            batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:].to(opt.device)
-            batch_pred = render_ray(model, opt.near, opt.far, 10, batch_rays, opt) #nb,4
+            batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:].to(opt.device)            
+            batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
             opt.writer.add_scalar('loss', loss, opt.global_step)
             print('loss:', loss)
@@ -37,13 +37,15 @@ def train_one_epoch(loader, model, optimizer, opt):
                 # save image
                 with torch.no_grad():
                     rays = img[:1, :, :, :6].to(opt.device)
-                    pred = render_image(model, opt.near, opt.far, 10, rays, opt=opt)[0]
-                    opt.writer.add_image('rendering', writable_image(pred.permute(2,0,1)), opt.global_step)
+                    pred = render_image(model, opt.near, opt.far, 64, rays, opt=opt)[0]
+                    gt = img[:, :, :, 6:].to(opt.device)[0]
+                    opt.writer.add_image('pred', writable_image(pred.permute(2,0,1)), opt.global_step)
+                    opt.writer.add_image('gt', writable_image(gt.permute(2,0,1)), opt.global_step)
             
 
 def train(train_dataloader, model, optimizer, opt):
     model.train()
-    # set up logging 
+    # logging 
     opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
     opt.global_step = 0
     for i_epoch in range(opt.epoch):

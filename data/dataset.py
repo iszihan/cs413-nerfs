@@ -8,6 +8,7 @@ from common.util import spherical_poses
 from common.rays import get_rays
 import os 
 import json 
+import cv2
 import imageio
 import torch
 import numpy as np 
@@ -29,7 +30,7 @@ class NerfDataset():
         
         # self.rays_rgb = {k: get_rays(self.h, self.w, self.K, self.poses[k], self.imgs[k]) for k in self.imgs}
 
-    def get_blender_dataset(self, basedir):
+    def get_blender_dataset(self, basedir, half_res=True):
         data = {}
         categories = ['train', 'val', 'test']
         for c in categories:
@@ -53,6 +54,19 @@ class NerfDataset():
         h,w = allimgs[categories[0]][0].shape[:2]
         camera_angle_x = float(d['camera_angle_x'])
         focal = .5 * w / np.tan(.5 * camera_angle_x)
+
+        if half_res:
+            h = h//2
+            w = w//2
+            focal = focal/2.
+
+            imgs_half_res = {}
+            for i, c in enumerate(allimgs):
+                imgs_half_res[c] = []
+                for img in allimgs[c]:
+                    imgs_half_res[c].append(cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA))
+                imgs_half_res[c] = np.array(imgs_half_res[c])
+            allimgs = imgs_half_res
         return allimgs, allposes, h, w, focal
 
     def __len__(self):
