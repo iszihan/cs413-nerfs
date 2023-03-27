@@ -24,23 +24,21 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_indices = ray_indices[i_batch * opt.batch_rays : (i_batch + 1) * opt.batch_rays]
             batch_indices = np.unravel_index(batch_indices, (img.shape[0], img.shape[1], img.shape[2]))
             batch_indices = np.stack(batch_indices, axis=1)
-            batch_rays = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], :6]
-            batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:]
-            
-            batch_pred = render_ray(model, opt.near, opt.far, 10, batch_rays) #nb,4
+            batch_rays = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], :6].to(opt.device)
+            batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:].to(opt.device)
+            batch_pred = render_ray(model, opt.near, opt.far, 10, batch_rays, opt) #nb,4
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            print(loss)
             opt.writer.add_scalar('loss', loss, opt.global_step)
+            print('loss:', loss)
             loss.backward()
             optimizer.step()
         
             if i_batch % 1 == 0:
                 # save image
-                rays = img[:1, :, :, :6]
-                pred = render_image(model, opt.near, opt.far, 10, rays)[0]
-                #pred = torch.round(255*pred).clip(0,255).to(torch.uint8)
-                opt.writer.add_image(writable_image(pred), opt.global_step)
-                exit()
+                with torch.no_grad():
+                    rays = img[:1, :, :, :6].to(opt.device)
+                    pred = render_image(model, opt.near, opt.far, 10, rays, opt=opt)[0]
+                    opt.writer.add_image('rendering', writable_image(pred.permute(2,0,1)), opt.global_step)
             
 
 def train(train_dataloader, model, optimizer, opt):

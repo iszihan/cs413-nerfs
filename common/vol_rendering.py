@@ -3,7 +3,7 @@ import torch
 import nerf.nerf as nerf
 import common.rays as rays_module
 
-def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None):
+def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=None):
     """"
     @input:
     rays: [nr, 6]
@@ -11,10 +11,10 @@ def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None):
     imgs: [b, h, w, 3]
     """
     cam_rays = rays.reshape(rays.shape[0], 2, 3)
-    rgba = expected_colour(model, cam_rays, t_n, t_f, n_samples)
+    rgba = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
     return rgba
 
-def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None):
+def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None, opt=None):
     """
     h, w: image height and width
     focal: focal length
@@ -42,13 +42,13 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
         # two rows at a time to avoid OOM
         for i in range(cam_rays_i.shape[0]):
             cam_rays_i_batch = cam_rays_i[i, ...].reshape(-1, 2, 3)
-            rgba = expected_colour(model, cam_rays_i_batch.reshape(-1, 2, 3), t_n, t_f, n_samples)
+            rgba = expected_colour(model, cam_rays_i_batch.reshape(-1, 2, 3), t_n, t_f, n_samples, opt)
             # assign colour to image
             imgs[cam, i, :, :] = rgba.reshape(w, 4)
     return imgs
 
 
-def expected_colour(model, rays, t_n, t_f, n_samples):
+def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     """
     rays = [origin, direction] of shape [n_rays, 2, 3]
     t_n, t_f = ray interval
@@ -57,7 +57,7 @@ def expected_colour(model, rays, t_n, t_f, n_samples):
     Expected colour, alpha of the rays
     Returns: [n_rays, 4]
     """
-    samples = stratified_sampling(t_n, t_f, n_samples)
+    samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
     pts = rays[:, 0, :].repeat(1, n_samples).reshape(-1, 3) + \
           rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3) * samples.repeat(rays.shape[0], 3)
     input = torch.cat([pts, rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
@@ -67,7 +67,9 @@ def expected_colour(model, rays, t_n, t_f, n_samples):
     output = model(input.reshape(rays.shape[0], n_samples, -1).float()).reshape(-1, 4)         # [n_rays*n_samples, 4]
     rgb = output[:, :3]
     density = output[:, 3]
-    temp = torch.cat([samples[1:] - samples[:-1], torch.tensor([[t_f - samples[-1]]])], dim = 0).squeeze().repeat(rays.shape[0])
+
+    temp = torch.cat([samples[1:] - samples[:-1], 
+                      torch.tensor([[torch.tensor(t_f) - samples[-1]]]).to(opt.device)], dim = 0).to(opt.device).squeeze().repeat(rays.shape[0])
     weighted_density = density * temp
     accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density, dim=0))
     weights = torch.ones_like(weighted_density) - torch.exp(-weighted_density)

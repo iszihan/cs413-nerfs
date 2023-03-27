@@ -19,6 +19,8 @@ parser.add_argument('--outdir', type=str, default='./output', help="output direc
 parser.add_argument('--expname', type=str, default='trial', help="experiment name")
 opt = parser.parse_args()
 
+opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Construct dataset
 train_dataset = NerfDataset(dataset='blender', mode='test')
 opt.h, opt.w, opt.focal, opt.near, opt.far = train_dataset.getConstants()
@@ -27,7 +29,7 @@ opt.h, opt.w, opt.focal, opt.near, opt.far = train_dataset.getConstants()
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
 # Construct nerf model
-model = NerfModel(use_viewdirs=True)
+model = NerfModel(use_viewdirs=True).to(opt.device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 # Train
