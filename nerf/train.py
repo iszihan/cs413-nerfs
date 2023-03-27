@@ -26,6 +26,7 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_indices = np.stack(batch_indices, axis=1)
             batch_rays = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], :6]
             batch_rgb = img[batch_indices[:, 0], batch_indices[:, 1], batch_indices[:, 2], 6:]
+            
             batch_pred = render_ray(model, opt.near, opt.far, 10, batch_rays) #nb,4
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
             print(loss)

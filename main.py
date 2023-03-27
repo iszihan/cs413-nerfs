@@ -32,6 +32,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 # Train
 train(train_dataloader, model, optimizer, opt)
+
 exit()
 rays_rgb_image = next(iter(train_dataloader))  # 1, h, w, 9
 rays = rays_rgb_image[:, :, :, :6]  # 1, h, w, 6

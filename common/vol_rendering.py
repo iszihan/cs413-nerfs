@@ -39,9 +39,12 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
         # get rays for each camera
         cam_rays_i = cam_rays[cam] # [h, w, 2, 3]
         # get expected colour for each ray
-        rgba = expected_colour(model, cam_rays_i.reshape(-1, 2, 3), t_n, t_f, n_samples)
-        # assign colour to image
-        imgs[cam, :, :, :] = rgba.reshape(h, w, 4)
+        # two rows at a time to avoid OOM
+        for i in range(cam_rays_i.shape[0]):
+            cam_rays_i_batch = cam_rays_i[i, ...].reshape(-1, 2, 3)
+            rgba = expected_colour(model, cam_rays_i_batch.reshape(-1, 2, 3), t_n, t_f, n_samples)
+            # assign colour to image
+            imgs[cam, i, :, :] = rgba.reshape(w, 4)
     return imgs
 
 
@@ -58,7 +61,10 @@ def expected_colour(model, rays, t_n, t_f, n_samples):
     pts = rays[:, 0, :].repeat(1, n_samples).reshape(-1, 3) + \
           rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3) * samples.repeat(rays.shape[0], 3)
     input = torch.cat([pts, rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
-    output = model(input.reshape(rays.shape[0], n_samples, 6).float()).reshape(-1, 4)         # [n_rays*n_samples, 4]
+    # positional encoding 
+    encoded_pts, encoded_views = model.encode_input(input) #8000, 60; 8000, 24
+    input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
+    output = model(input.reshape(rays.shape[0], n_samples, -1).float()).reshape(-1, 4)         # [n_rays*n_samples, 4]
     rgb = output[:, :3]
     density = output[:, 3]
     temp = torch.cat([samples[1:] - samples[:-1], torch.tensor([[t_f - samples[-1]]])], dim = 0).squeeze().repeat(rays.shape[0])
