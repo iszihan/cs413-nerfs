@@ -60,6 +60,11 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
     pts = rays[:, 0, :].repeat(1, n_samples).reshape(-1, 3) + \
           rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3) * samples.repeat(rays.shape[0], 3)
+    # print(pts.shape)
+    # print(pts.reshape(800, 64, 3))
+    # print(rays[:,0,:])
+    # print(rays[:,1,:])
+    # exit()
     input = torch.cat([pts, rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
     # positional encoding 
     encoded_pts, encoded_views = model.encode_input(input) #8000, 60; 8000, 24
