@@ -22,7 +22,12 @@ def get_rays(h,w,K,p,imgs):
                         -np.ones_like(i)], -1) # [800, 800, 3]
     rays = []
     for _p in p:
-        raysd = np.dot(dirs[..., :].reshape(-1,3), _p[:3,:3]).reshape(dirs.shape[0], dirs.shape[1],3)
+        #raysd = np.dot(dirs[..., :].reshape(-1,3), _p[:3,:3]).reshape(dirs.shape[0], dirs.shape[1],3)
+        # print(dirs.shape)
+        # print((dirs[...,np.newaxis,:] * _p[:3,:3]).shape)
+        # exit()
+        raysd = np.dot(_p[:3,:3], dirs[...,:].reshape(-1,3).transpose(1,0)).transpose(1,0).reshape(dirs.shape[0], dirs.shape[1],3)
+        #raysd = np.sum(dirs[..., np.newaxis, :] * _p[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
         rayso = np.broadcast_to(_p[:3,-1], np.shape(raysd))
         rays.append([rayso, raysd])
     rays = np.stack(rays, 0) #200, 800, 800, 3 

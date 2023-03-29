@@ -23,11 +23,14 @@ opt = parser.parse_args()
 opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Construct dataset
-train_dataset = NerfDataset(dataset='blender', mode='test')
+train_dataset = NerfDataset(dataset='blender', mode='train')
+# train_dataset.__getitem__(0)
+# exit()
 opt.h, opt.w, opt.focal, opt.near, opt.far = train_dataset.getConstants()
 
 # Construct dataloader for coarse training
-train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+
 
 # Construct nerf model
 model = NerfModel(use_viewdirs=True).to(opt.device)

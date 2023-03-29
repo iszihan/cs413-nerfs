@@ -47,10 +47,11 @@ class NerfDataset():
                 imgs.append(imageio.imread(filename))
                 poses.append(np.array(f['transform_matrix']))
             imgs = (np.array(imgs) / 255.).astype(np.float32)
+            #use white background
+            imgs = imgs[...,:3]*imgs[...,-1:] + (1.-imgs[...,-1:])
             poses = np.array(poses).astype(np.float32)
             allimgs[c] = imgs 
             allposes[c] = poses
-        
         h,w = allimgs[categories[0]][0].shape[:2]
         camera_angle_x = float(d['camera_angle_x'])
         focal = .5 * w / np.tan(.5 * camera_angle_x)
@@ -59,7 +60,6 @@ class NerfDataset():
             h = h//2
             w = w//2
             focal = focal/2.
-
             imgs_half_res = {}
             for i, c in enumerate(allimgs):
                 imgs_half_res[c] = []
@@ -76,7 +76,14 @@ class NerfDataset():
         return self.h, self.w, self.f, self.near, self.far
 
     def __getitem__(self, i):
+        # print(self.imgs[self.mode][i])
+        # print(self.imgs[self.mode][i].shape)
+        # print(self.poses[self.mode][i])
+        # exit()
         rays_rgb = get_rays(self.h, self.w, self.K, self.poses[self.mode][i:i + 1], self.imgs[self.mode][i:i + 1])
         rays_rgb = torch.tensor(rays_rgb.squeeze(0))
         rays_rgb = rays_rgb.permute(1,2,0,3).reshape(rays_rgb.shape[1],rays_rgb.shape[2],9) # h, w, 9 (rayo + rayd + rgb)
+        # print(rays_rgb[...,:3])
+        # print(rays_rgb[...,3:6])
+        # exit()
         return rays_rgb
