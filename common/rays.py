@@ -30,7 +30,7 @@ def get_rays(h,w,K,p,imgs):
         #raysd = np.sum(dirs[..., np.newaxis, :] * _p[:3,:3], -1)  # dot product, equals to: [c2w.dot(dir) for dir in dirs]
         rayso = np.broadcast_to(_p[:3,-1], np.shape(raysd))
         rays.append([rayso, raysd])
-    rays = np.stack(rays, 0) #200, 800, 800, 3 
+    rays = np.stack(rays, 0) #200, 800, 800, 3
     rays_rgb = np.concatenate([rays, imgs[:,None,:,:,:3]],1)
     return rays_rgb
 

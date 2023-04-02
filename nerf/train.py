@@ -7,8 +7,10 @@ import numpy as np
 import torch 
 from common.util import writable_image
 
+
 def eval():
     return None
+
 
 def train_one_epoch(loader, model, optimizer, opt):
 
@@ -20,7 +22,7 @@ def train_one_epoch(loader, model, optimizer, opt):
         # ray_indices = np.array(range(n_rays))
         # np.random.shuffle(ray_indices)
         # n_batches = n_rays // opt.batch_rays
-        if i < 500:
+        if i < 500 and h>256 and w>256:
             # center cropping 
             dh = int(h//2 * 0.5)
             dw = int(w//2 * 0.5)
@@ -45,19 +47,19 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
             opt.writer.add_scalar('loss', loss, opt.global_step)
-            print('loss:', loss)
+            print('loss ', i_batch, ':', loss)
             loss.backward()
             optimizer.step()
-        
-            if i_batch % 1 == 0:
+
+            if i_batch % 50 == 0:
                 # save image
                 with torch.no_grad():
                     rays = img[:1, :, :, :6].to(opt.device)
                     pred = render_image(model, opt.near, opt.far, 64, rays, opt=opt)[0]
                     gt = img[:, :, :, 6:].to(opt.device)[0]
-                    opt.writer.add_image('pred', writable_image(pred.permute(2,0,1)), opt.global_step)
-                    opt.writer.add_image('gt', writable_image(gt.permute(2,0,1)), opt.global_step)
-            
+                    opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
+                    opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
+
 
 def train(train_dataloader, model, optimizer, opt):
     model.train()
@@ -66,7 +68,7 @@ def train(train_dataloader, model, optimizer, opt):
     opt.global_step = 0
     for i_epoch in range(opt.epoch):
         train_one_epoch(train_dataloader, model, optimizer, opt)
-        save_checkpoint(model, optimizer, opt, i_epoch)
-    
+        # save_checkpoint(model, optimizer, opt, i_epoch)
+
 def save_checkpoint():
     return None

@@ -1,7 +1,9 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 import nerf.nerf as nerf
 import common.rays as rays_module
+
 
 def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=None):
     """"
@@ -13,6 +15,7 @@ def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=N
     cam_rays = rays.reshape(rays.shape[0], 2, 3)
     rgba = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
     return rgba
+
 
 def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None, opt=None):
     """
@@ -60,30 +63,25 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
     pts = rays[:, 0, :].repeat(1, n_samples).reshape(-1, 3) + \
           rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3) * samples.repeat(rays.shape[0], 3)
-    # print(pts.shape)
-    # print(pts.reshape(800, 64, 3))
-    # print(rays[:,0,:])
-    # print(rays[:,1,:])
-    # exit()
     input = torch.cat([pts, rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
     # positional encoding 
     encoded_pts, encoded_views = model.encode_input(input) #8000, 60; 8000, 24
     input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
-    output = model(input.reshape(rays.shape[0], n_samples, -1).float()).reshape(-1, 4) # [n_rays*n_samples, 4]
- 
-    rgb = output[:, :3]
-    density = output[:, 3]
-    temp = torch.cat([samples[1:] - samples[:-1], 
-                      torch.tensor([[torch.tensor(t_f) - samples[-1]]]).to(opt.device)], dim = 0).to(opt.device).squeeze().repeat(rays.shape[0])
-    weighted_density = density * temp
-    accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density, dim=0))
-    weights = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
-    colour_pred = torch.sum(((weights * accumulated_transmittance)[:, None].repeat(1, 3) * rgb).reshape(rays.shape[0], n_samples, 3), dim=1)
-    #print(colour_pred.shape)
-    alpha = accumulated_transmittance.reshape(rays.shape[0], n_samples)[:, -1].reshape(rays.shape[0], 1)
-    #print(alpha.shape)
-    output = torch.cat([colour_pred, alpha], dim = 1)
-    #print(output.shape)
+    output = model(input.reshape(rays.shape[0], n_samples, -1).float()) # [n_rays, n_samples, 4]
+
+    rgb = torch.sigmoid(output[:, :, :3])  # [n_rays , n_samples, 3]
+    density = torch.nn.functional.relu(output[:, :, 3]).reshape(
+        -1)  # [n_rays * n_samples]
+    dist = torch.cat([samples[1:] - samples[:-1],
+                      torch.tensor([[1e10]])], dim=0).squeeze().repeat(rays.shape[0])  # [n_rays * n_samples]
+    ray_norms = torch.norm(rays[:, 1, :], dim=1).repeat(1, n_samples).reshape(-1)  # [n_rays * n_samples]
+    dist = dist * ray_norms
+    weighted_density = (density * dist).reshape(rays.shape[0], n_samples)
+    accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density + 1e-10, dim=1))
+    alphas = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
+    colour_pred = torch.sum(((alphas * accumulated_transmittance)[..., None].repeat(1, 1, 3) * rgb), dim=1)
+    alpha = alphas[:, -1]
+    output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
     return output
 
 

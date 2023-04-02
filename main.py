@@ -11,33 +11,34 @@ from torchvision.utils import save_image
 import click 
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--batch_rays', type=int, default=800, help="ray batch size")
-parser.add_argument('--batch_imgs', type=int, default=1, help="image batch size")
-parser.add_argument('--epoch', type=int, default=200, help="epoch size")
-parser.add_argument('--outdir', type=str, default='./output', help="output directory")
-parser.add_argument('--expname', type=str, default='trial', help="experiment name")
-parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray')
-opt = parser.parse_args()
 
-opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--batch_rays', type=int, default=200, help="ray batch size")
+    parser.add_argument('--batch_imgs', type=int, default=1, help="image batch size")
+    parser.add_argument('--epoch', type=int, default=200, help="epoch size")
+    parser.add_argument('--outdir', type=str, default='./output/lego/run1', help="output directory")
+    parser.add_argument('--expname', type=str, default='trial', help="experiment name")
+    parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray')
+    opt = parser.parse_args()
 
-# Construct dataset
-train_dataset = NerfDataset(dataset='blender', mode='train')
-# train_dataset.__getitem__(0)
-# exit()
-opt.h, opt.w, opt.focal, opt.near, opt.far = train_dataset.getConstants()
+    opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Construct dataloader for coarse training
-train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
+    # Construct dataset
+    train_dataset = NerfDataset(dataset='blender', mode='train')
+    opt.h, opt.w, opt.focal, opt.near, opt.far = train_dataset.getConstants()
+
+    # Construct dataloader for coarse training
+    train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False)
 
 
-# Construct nerf model
-model = NerfModel(use_viewdirs=True).to(opt.device)
-optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+    # Construct nerf model
+    model = NerfModel(use_viewdirs=True).to(opt.device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
 
-# Train
-train(train_dataloader, model, optimizer, opt)
+    # Train
+    train(train_dataloader, model, optimizer, opt)
+
 
 if __name__ == '__main__':
     main()
