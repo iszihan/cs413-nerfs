@@ -17,7 +17,7 @@ def main():
     parser.add_argument('--batch_rays', type=int, default=200, help="ray batch size")
     parser.add_argument('--batch_imgs', type=int, default=1, help="image batch size")
     parser.add_argument('--epoch', type=int, default=200, help="epoch size")
-    parser.add_argument('--outdir', type=str, default='./output/lego/run1', help="output directory")
+    parser.add_argument('--outdir', type=str, default='./output/lego/run2', help="output directory")
     parser.add_argument('--expname', type=str, default='trial', help="experiment name")
     parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray')
     opt = parser.parse_args()

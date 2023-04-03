@@ -13,7 +13,7 @@ def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=N
     imgs: [b, h, w, 3]
     """
     cam_rays = rays.reshape(rays.shape[0], 2, 3)
-    rgba = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
+    rgba, weights, samples = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
     return rgba
 
 
@@ -45,44 +45,66 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
         # two rows at a time to avoid OOM
         for i in range(cam_rays_i.shape[0]):
             cam_rays_i_batch = cam_rays_i[i, ...].reshape(-1, 2, 3)
-            rgba = expected_colour(model, cam_rays_i_batch, t_n, t_f, n_samples, opt)
+            rgba, weights, samples = expected_colour(model, cam_rays_i_batch, t_n, t_f, n_samples, opt)
             # assign colour to image
             imgs[cam, i, :, :] = rgba.reshape(w, 4)
     return imgs
 
 
-def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
+def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_samples=None):
     """
     rays = [origin, direction] of shape [n_rays, 2, 3]
     t_n, t_f = ray interval
     n_samples = number of samples
+    opt = options
+    course = True if coarse training, default True
+    h_samples = [n_rays, n_samples], samples along the rays for fine training, default None
 
-    Expected colour, alpha of the rays
-    Returns: [n_rays, 4]
+    Expected colour, alpha of the rays; weights of the samples for hierarchical sampling
+    Returns:
+        output: [n_rays, 4]
+        weights: [n_rays, n_samples]
+        samples: [n_rays, n_samples]
     """
-    samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
-    pts = rays[:, 0, :].repeat(1, n_samples).reshape(-1, 3) + \
-          rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3) * samples.repeat(rays.shape[0], 3)
-    input = torch.cat([pts, rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
-    # positional encoding 
+    if course is True:
+        samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
+        samples = samples.transpose(0,1).repeat(rays.shape[0], 1)
+    else:
+        # assertion message asking for h_samples
+        assert h_samples is not None, "h_samples is None"
+        samples = h_samples.to(opt.device)
+
+    # get points along the rays
+    pts = rays[:, 0, :].unsqueeze(1).repeat(1, n_samples, 1) + \
+          rays[:, 1, :].unsqueeze(1).repeat(1, n_samples, 1) * samples.unsqueeze(-1).repeat(1, 1, 3)
+
+    # get density and colour for each point from the model
+    input = torch.cat([pts.reshape(-1, 3), rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
+    # positional encoding
     encoded_pts, encoded_views = model.encode_input(input) #8000, 60; 8000, 24
     input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
     output = model(input.reshape(rays.shape[0], n_samples, -1).float()) # [n_rays, n_samples, 4]
 
+    # activation for density and colour
     rgb = torch.sigmoid(output[:, :, :3])  # [n_rays , n_samples, 3]
-    density = torch.nn.functional.relu(output[:, :, 3]).reshape(
-        -1)  # [n_rays * n_samples]
-    dist = torch.cat([samples[1:] - samples[:-1],
-                      torch.tensor([[1e10]])], dim=0).squeeze().repeat(rays.shape[0])  # [n_rays * n_samples]
-    ray_norms = torch.norm(rays[:, 1, :], dim=1).repeat(1, n_samples).reshape(-1)  # [n_rays * n_samples]
+    density = torch.nn.functional.relu(output[:, :, 3]) # [n_rays , n_samples]
+
+    # distance between samples
+    dist = torch.cat([samples[:, 1:] - samples[:, :-1],
+                        1e10*torch.ones(rays.shape[0], 1).to(opt.device)], dim=1)  # [n_rays, n_samples]
+    ray_norms = torch.norm(rays[:, 1, :].unsqueeze(1).repeat(1, n_samples, 1), dim=-1) # [n_rays , n_samples]
     dist = dist * ray_norms
+
+    # compute expected colour, alpha, weights
     weighted_density = (density * dist).reshape(rays.shape[0], n_samples)
     accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density + 1e-10, dim=1))
     alphas = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
-    colour_pred = torch.sum(((alphas * accumulated_transmittance)[..., None].repeat(1, 1, 3) * rgb), dim=1)
+    final_weights = alphas * accumulated_transmittance
+    colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
     alpha = alphas[:, -1]
     output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
-    return output
+
+    return output, final_weights, samples
 
 
 def stratified_sampling(t_n, t_f, n_samples):
