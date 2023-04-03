@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--outdir', type=str, default='./output/lego/run2', help="output directory")
     parser.add_argument('--expname', type=str, default='trial', help="experiment name")
     parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray')
+    parser.add.argument('--checkpoint', type=str, default=None, help='checkpoint path')
     opt = parser.parse_args()
 
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -35,6 +36,15 @@ def main():
     # Construct nerf model
     model = NerfModel(use_viewdirs=True).to(opt.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+
+    # Load checkpoint
+    if opt.checkpoint is not None:
+        checkpoint = torch.load(opt.checkpoint)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        opt.global_step = checkpoint['global_step']
+        opt.epoch = checkpoint['epoch']
+        print('Loaded checkpoint from epoch', opt.epoch)
 
     # Train
     train(train_dataloader, model, optimizer, opt)

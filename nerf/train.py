@@ -68,7 +68,14 @@ def train(train_dataloader, model, optimizer, opt):
     opt.global_step = 0
     for i_epoch in range(opt.epoch):
         train_one_epoch(train_dataloader, model, optimizer, opt)
-        # save_checkpoint(model, optimizer, opt, i_epoch)
+        if i_epoch % 50 == 0:
+            save_checkpoint(model, optimizer, opt, i_epoch)
 
-def save_checkpoint():
-    return None
+
+def save_checkpoint(model, optimizer, opt, epoch):
+    # save model
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        }, os.path.join(opt.outdir, opt.expname, 'checkpoints', 'checkpoint_{}.pt'.format(epoch)))
