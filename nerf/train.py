@@ -1,4 +1,4 @@
-
+from tqdm.auto import tqdm
 import tensorboardX
 import os 
 from common.vol_rendering import volumetric_rendering_per_image as render_image
@@ -46,12 +46,13 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_rgb = img[0, batch_indices[:, 0], batch_indices[:, 1], 6:].to(opt.device)            
             batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            opt.writer.add_scalar('loss', loss, opt.global_step)
-            print('loss ', i_batch, ':', loss)
+            # opt.writer.add_scalar('loss', loss, opt.global_step)
+            # print('loss ', i_batch, ':', loss)
             loss.backward()
             optimizer.step()
 
             if i_batch % 50 == 0:
+                opt.writer.add_scalar('loss', loss, opt.global_step)
                 # save image
                 with torch.no_grad():
                     rays = img[:1, :, :, :6].to(opt.device)
@@ -66,10 +67,13 @@ def train(train_dataloader, model, optimizer, opt):
     # logging 
     opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
     opt.global_step = 0
-    for i_epoch in range(opt.epoch):
+    # use tqdm to show progress bar
+    for i_epoch in tqdm(range(opt.epoch)):
+        print('epoch ', i_epoch)
         train_one_epoch(train_dataloader, model, optimizer, opt)
-        if i_epoch % 50 == 0:
+        if i_epoch % 25 == 0:
             save_checkpoint(model, optimizer, opt, i_epoch)
+            print('saved checkpoint at epoch {}'.format(i_epoch))
 
 
 def save_checkpoint(model, optimizer, opt, epoch):
