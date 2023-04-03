@@ -89,4 +89,4 @@ def save_checkpoint(model, optimizer, opt, epoch):
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        }, os.path.join(opt.outdir, opt.expname, 'checkpoints', 'checkpoint_{}.pt'.format(epoch)))
+        }, os.path.join(opt.outdir, opt.expname, 'checkpoint_{}.pt'.format(epoch)))

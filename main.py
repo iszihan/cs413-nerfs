@@ -35,6 +35,7 @@ def main():
 
     # Construct nerf model
     model = NerfModel(use_viewdirs=True).to(opt.device)
+    model = torch.nn.DataParallel(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
 
     # Load checkpoint
