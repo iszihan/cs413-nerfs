@@ -51,9 +51,10 @@ def train_one_epoch(loader, model, optimizer, opt):
             loss.backward()
             optimizer.step()
 
-            if i_batch % 50 == 0:
+            if i_batch % 10 == 0:
                 opt.writer.add_scalar('loss', loss, opt.global_step)
                 # save image
+            if i_batch % 100 == 0:
                 with torch.no_grad():
                     rays = img[:1, :, :, :6].to(opt.device)
                     pred = render_image(model, opt.near, opt.far, 64, rays, opt=opt)[0]
@@ -63,17 +64,23 @@ def train_one_epoch(loader, model, optimizer, opt):
 
 
 def train(train_dataloader, model, optimizer, opt):
-    model.train()
-    # logging 
-    opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
-    opt.global_step = 0
-    # use tqdm to show progress bar
-    for i_epoch in tqdm(range(opt.epoch)):
-        print('epoch ', i_epoch)
-        train_one_epoch(train_dataloader, model, optimizer, opt)
-        if i_epoch % 25 == 0:
-            save_checkpoint(model, optimizer, opt, i_epoch)
-            print('saved checkpoint at epoch {}'.format(i_epoch))
+    # on keyboar interrupt, save model
+    try:
+        model.train()
+        # logging
+        opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
+        opt.global_step = 0
+        # use tqdm to show progress bar
+        for i_epoch in tqdm(range(opt.epoch)):
+            train_one_epoch(train_dataloader, model, optimizer, opt)
+            if i_epoch % 25 == 0 or i_epoch == opt.epoch - 1:
+                save_checkpoint(model, optimizer, opt, i_epoch)
+                print('saved checkpoint at epoch {}'.format(i_epoch))
+
+    except KeyboardInterrupt:
+        save_checkpoint(model, optimizer, opt, opt.epoch)
+        print('saved checkpoint at epoch {}'.format(opt.epoch))
+        print('training interrupted')
 
 
 def save_checkpoint(model, optimizer, opt, epoch):

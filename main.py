@@ -20,7 +20,7 @@ def main():
     parser.add_argument('--outdir', type=str, default='./output/lego/run2', help="output directory")
     parser.add_argument('--expname', type=str, default='trial', help="experiment name")
     parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray')
-    parser.add.argument('--checkpoint', type=str, default=None, help='checkpoint path')
+    parser.add_argument('--checkpoint', type=str, default=None, help='checkpoint path')
     opt = parser.parse_args()
 
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
