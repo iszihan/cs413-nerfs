@@ -17,12 +17,8 @@ def train_one_epoch(loader, model, optimizer, opt):
     for i, img in enumerate(loader):
         nb, h, w = img.shape[:3]
 
-        # batchify rays 
-        # n_rays = img.shape[0] * img.shape[1] * img.shape[2] 
-        # ray_indices = np.array(range(n_rays))
-        # np.random.shuffle(ray_indices)
-        # n_batches = n_rays // opt.batch_rays
-        if i < 500 and h>256 and w>256:
+        # center cropping for first 500 images 
+        if opt.global_step < opt.iter_coarse and h>256 and w>256:
             # center cropping 
             dh = int(h//2 * 0.5)
             dw = int(w//2 * 0.5)
@@ -40,20 +36,22 @@ def train_one_epoch(loader, model, optimizer, opt):
         for i_batch in range(n_batches):
             optimizer.zero_grad()
             opt.global_step += 1
+
             batch_indices = ray_indices[i_batch * opt.batch_rays : (i_batch + 1) * opt.batch_rays]
             batch_indices = coords[batch_indices].long()
             batch_rays = img[0, batch_indices[:, 0], batch_indices[:, 1], :6].to(opt.device)
-            batch_rgb = img[0, batch_indices[:, 0], batch_indices[:, 1], 6:].to(opt.device)            
+            batch_rgb = img[0, batch_indices[:, 0], batch_indices[:, 1], 6:].to(opt.device) 
+
             batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
+
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            # opt.writer.add_scalar('loss', loss, opt.global_step)
-            # print('loss ', i_batch, ':', loss)
             loss.backward()
             optimizer.step()
 
             if i_batch % 10 == 0:
                 opt.writer.add_scalar('loss', loss, opt.global_step)
-                # save image
+            
+            # log image
             if i_batch % 100 == 0:
                 with torch.no_grad():
                     rays = img[:1, :, :, :6].to(opt.device)

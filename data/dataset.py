@@ -18,7 +18,7 @@ class NerfDataset():
         self.dataset = dataset 
         if dataset=='blender':
             # referencing https://github.com/yenchenlin/nerf-pytorch/blob/223fe62d87d641e2bb0fb5bdbbcb6dad5efb2af3/run_nerf.py
-            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./data/nerf_synthetic/lego')
+            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./dataset/nerf_synthetic/lego')
             # self.poses: 100,4,4
             # Construct Intrinsic 
             self.K = np.array([

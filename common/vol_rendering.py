@@ -51,7 +51,7 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
     return imgs
 
 
-def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_samples=None):
+def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     """
     rays = [origin, direction] of shape [n_rays, 2, 3]
     t_n, t_f = ray interval
@@ -66,13 +66,12 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_s
         weights: [n_rays, n_samples]
         samples: [n_rays, n_samples]
     """
-    if course is True:
-        samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
-        samples = samples.transpose(0,1).repeat(rays.shape[0], 1)
-    else:
-        # assertion message asking for h_samples
-        assert h_samples is not None, "h_samples is None"
-        samples = h_samples.to(opt.device)
+
+    fine_sampling = opt.global_step > opt.iter_coarse
+
+    # coarse sampling always
+    samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
+    samples = samples.transpose(0,1).repeat(rays.shape[0], 1)
 
     # get points along the rays
     pts = rays[:, 0, :].unsqueeze(1).repeat(1, n_samples, 1) + \
@@ -80,10 +79,11 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_s
 
     # get density and colour for each point from the model
     input = torch.cat([pts.reshape(-1, 3), rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
+    
     # positional encoding
     encoded_pts, encoded_views = model.module.encode_input(input) #8000, 60; 8000, 24
     input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
-    output = model(input.reshape(rays.shape[0], n_samples, -1).float()) # [n_rays, n_samples, 4]
+    output = model(input.reshape(rays.shape[0], n_samples, -1).float())# [n_rays, n_samples, 4]
 
     # activation for density and colour
     rgb = torch.sigmoid(output[:, :, :3])  # [n_rays , n_samples, 3]
@@ -100,12 +100,91 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_s
     accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density + 1e-10, dim=1))
     alphas = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
     final_weights = alphas * accumulated_transmittance
-    colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
-    alpha = alphas[:, -1]
-    output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
+    if not fine_sampling:
+        # composite using coarse points only 
+        colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
+        alpha = alphas[:, -1]
+        output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
+        return output, final_weights, samples
+    else:
+        # fine sampling 
+        samples_mid = 0.5 * (samples[:, 1:] + samples[:, :-1])
+        fine_samples = inverse_transform_sampling(samples_mid, final_weights[:,1:-1], opt)
+        
+        # cat and sort coarse samples with fine samples
+        samples, _ = torch.sort(torch.cat([samples, fine_samples], dim=-1),dim=-1)
 
-    return output, final_weights, samples
+        # composite using coarse + fine points 
+        # get points along the rays
+        n_samples = samples.shape[1]
+        pts = rays[:, 0, :].unsqueeze(1).repeat(1, n_samples, 1) + \
+              rays[:, 1, :].unsqueeze(1).repeat(1, n_samples, 1) * samples.unsqueeze(-1).repeat(1, 1, 3)
 
+        # get density and colour for each point from the model
+        input = torch.cat([pts.reshape(-1, 3), rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
+        
+        # positional encoding
+        encoded_pts, encoded_views = model.module.encode_input(input) #8000, 60; 8000, 24
+        input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
+        output = model(input.reshape(rays.shape[0], n_samples, -1).float())# [n_rays, n_samples, 4]
+
+        # activation for density and colour
+        rgb = torch.sigmoid(output[:, :, :3])  # [n_rays , n_samples, 3]
+        density = torch.nn.functional.relu(output[:, :, 3]) # [n_rays , n_samples]
+
+        # distance between samples
+        dist = torch.cat([samples[:, 1:] - samples[:, :-1],
+                            1e10*torch.ones(rays.shape[0], 1).to(opt.device)], dim=1)  # [n_rays, n_samples]
+        ray_norms = torch.norm(rays[:, 1, :].unsqueeze(1).repeat(1, n_samples, 1), dim=-1) # [n_rays , n_samples]
+        dist = dist * ray_norms
+
+        # compute expected colour, alpha, weights
+        weighted_density = (density * dist).reshape(rays.shape[0], n_samples)
+        accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density + 1e-10, dim=1))
+        alphas = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
+        final_weights = alphas * accumulated_transmittance
+        # composite using coarse points only 
+        colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
+        alpha = alphas[:, -1]
+        output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
+        return output, final_weights, samples
+    
+def inverse_transform_sampling(coarse_samples_mid, weights, opt):
+    '''
+    Inverse transform sampling for fine sampling along a ray.
+    @input
+    coarse_samples_mid: [n_rays, n_samples-1]
+    weights: [n_rays, n_samples-2]
+    @output
+    samples: [n_rays, n_fine_samples]
+    '''
+    # get pdf
+    weights = weights + 1e-5 
+    pdf = weights / torch.sum(weights, dim=1, keepdim=True)
+    cdf = torch.cumsum(pdf, -1)
+    cdf = torch.cat([torch.zeros_like(cdf[:, :1]), cdf], dim=-1) 
+
+    # uniform samples first between [0, 1]
+    u = torch.rand(cdf.shape[0], opt.n_importance).to(opt.device)
+
+    # invert cdf and find indices
+    u = u.contiguous()
+    indices = torch.searchsorted(cdf, u, right=True) 
+    indices_below = torch.clamp(indices - 1, min=0)
+    indices_above = torch.clamp(indices, max=cdf.shape[1] - 1)
+    indices_both_sided = torch.stack([indices_below, indices_above], dim=-1)
+    
+    # get the values used for sampling  
+    expand_shape = [cdf.shape[0], opt.n_importance, cdf.shape[1]] # 800, 18, 63
+    cdf_both_sided = torch.gather(cdf.unsqueeze(1).expand(expand_shape), 2, indices_both_sided)
+    coarse_samples_both_sided = torch.gather(coarse_samples_mid.unsqueeze(1).expand(expand_shape), 2, indices_both_sided)
+
+    # compute the sampled value 
+    denom = cdf_both_sided[:, :, 1] - cdf_both_sided[:, :, 0]
+    denom = torch.where(denom < 1e-5, torch.ones_like(denom), denom)
+    t = (u - cdf_both_sided[:, :, 0]) / denom
+    samples = coarse_samples_both_sided[:, :, 0] + t * (coarse_samples_both_sided[:, :, 1] - coarse_samples_both_sided[:, :, 0])
+    return samples
 
 def stratified_sampling(t_n, t_f, n_samples):
     """
