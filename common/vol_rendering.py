@@ -81,7 +81,7 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None, course=True, h_s
     # get density and colour for each point from the model
     input = torch.cat([pts.reshape(-1, 3), rays[:, 1, :].repeat(1, n_samples).reshape(-1, 3)], dim=1) # [n_rays * n_samples, 6]
     # positional encoding
-    encoded_pts, encoded_views = model.encode_input(input) #8000, 60; 8000, 24
+    encoded_pts, encoded_views = model.module.encode_input(input) #8000, 60; 8000, 24
     input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
     output = model(input.reshape(rays.shape[0], n_samples, -1).float()) # [n_rays, n_samples, 4]
 
