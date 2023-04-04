@@ -14,7 +14,7 @@ import argparse
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--batch_rays', type=int, default=800, help="ray batch size")
+    parser.add_argument('--batch_rays', type=int, default=200, help="ray batch size")
     parser.add_argument('--batch_imgs', type=int, default=1, help="image batch size")
     parser.add_argument('--epoch', type=int, default=200, help="epoch size")
     parser.add_argument('--outdir', type=str, default='./output/lego/run2', help="output directory")

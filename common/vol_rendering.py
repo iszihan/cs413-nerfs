@@ -67,7 +67,7 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
         samples: [n_rays, n_samples]
     """
 
-    fine_sampling = opt.global_step > opt.iter_coarse
+    fine_sampling = opt.fine_sampling
 
     # coarse sampling always
     samples = stratified_sampling(t_n, t_f, n_samples).to(opt.device)
@@ -109,7 +109,11 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     else:
         # fine sampling 
         samples_mid = 0.5 * (samples[:, 1:] + samples[:, :-1])
+        #np.save('./samples_mid.npy', samples_mid.detach().cpu().numpy())
+        #np.save('./final_weights.npy', final_weights[:,1:-1].detach().cpu().numpy())
         fine_samples = inverse_transform_sampling(samples_mid, final_weights[:,1:-1], opt)
+        #np.save('./fine_samples.npy', fine_samples.detach().cpu().numpy())
+        #exit()
         
         # cat and sort coarse samples with fine samples
         samples, _ = torch.sort(torch.cat([samples, fine_samples], dim=-1),dim=-1)
@@ -166,6 +170,7 @@ def inverse_transform_sampling(coarse_samples_mid, weights, opt):
 
     # uniform samples first between [0, 1]
     u = torch.rand(cdf.shape[0], opt.n_importance).to(opt.device)
+    np.save('./u.npy', u.detach().cpu().numpy())
 
     # invert cdf and find indices
     u = u.contiguous()
