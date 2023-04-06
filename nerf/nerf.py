@@ -84,11 +84,7 @@ class NerfModel(nn.Module):
             h = torch.cat([feature, input_views], -1)
             for i, l in enumerate(self.views_linears):
                 h = self.views_linears[i](h)
-                h = F.relu(h)
-            if torch.isnan(h).any() or torch.isinf(h).any():
-                print("h view is nan")
-                print(h)
-                exit()
+                h = F.relu(h) 
             rgb = self.rgb_linear(h)
             outputs = torch.cat([rgb, alpha], -1)
         else:

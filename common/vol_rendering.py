@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import nerf.nerf as nerf
 import common.rays as rays_module
-
+from common.util import printarr
 
 def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=None):
     """"
@@ -109,15 +109,18 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     else:
         # fine sampling 
         samples_mid = 0.5 * (samples[:, 1:] + samples[:, :-1])
-        #np.save('./samples_mid.npy', samples_mid.detach().cpu().numpy())
-        #np.save('./final_weights.npy', final_weights[:,1:-1].detach().cpu().numpy())
-        fine_samples = inverse_transform_sampling(samples_mid, final_weights[:,1:-1], opt)
-        #np.save('./fine_samples.npy', fine_samples.detach().cpu().numpy())
-        #exit()
         
+        # np.save('./samples_mid.npy', samples_mid.detach().cpu().numpy())
+        # np.save('./final_weights.npy', final_weights[:,1:-1].detach().cpu().numpy())
+        fine_samples = inverse_transform_sampling(samples_mid, final_weights[:,1:-1], opt)
+        # printarr(fine_samples)
+        # np.save('./fine_samples.npy', fine_samples.detach().cpu().numpy())
+        # exit()
+         
         # cat and sort coarse samples with fine samples
+        fine_samples = fine_samples.detach()
         samples, _ = torch.sort(torch.cat([samples, fine_samples], dim=-1),dim=-1)
-
+        # np.save('./fine_sample_sorted.npy', samples.detach().cpu().numpy())
         # composite using coarse + fine points 
         # get points along the rays
         n_samples = samples.shape[1]
@@ -130,7 +133,10 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
         # positional encoding
         encoded_pts, encoded_views = model.module.encode_input(input) #8000, 60; 8000, 24
         input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
-        output = model(input.reshape(rays.shape[0], n_samples, -1).float())# [n_rays, n_samples, 4]
+        # np.save('./fine_samples_encoded.npy', input.detach().cpu().numpy())
+
+        output = model(input.reshape(rays.shape[0], n_samples, -1).float())# [n_rays, n_samples, 84]
+        # np.save('./output.npy', output.detach().cpu().numpy())
 
         # activation for density and colour
         rgb = torch.sigmoid(output[:, :, :3])  # [n_rays , n_samples, 3]
@@ -147,10 +153,14 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
         accumulated_transmittance = torch.exp(-torch.cumsum(weighted_density + 1e-10, dim=1))
         alphas = torch.ones_like(weighted_density) - torch.exp(-weighted_density)
         final_weights = alphas * accumulated_transmittance
+
         # composite using coarse points only 
         colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
         alpha = alphas[:, -1]
         output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
+        
+        # np.save('./final_output.npy', output.detach().cpu().numpy())
+        #exit()
         return output, final_weights, samples
     
 def inverse_transform_sampling(coarse_samples_mid, weights, opt):

@@ -44,17 +44,20 @@ def train_one_epoch(loader, model, optimizer, opt):
             batch_indices = coords[batch_indices].long()
             batch_rays = img[0, batch_indices[:, 0], batch_indices[:, 1], :6].to(opt.device)
             batch_rgb = img[0, batch_indices[:, 0], batch_indices[:, 1], 6:].to(opt.device) 
+
             if i_batch / n_batches < 0.3:
-                opt.fine_sampling = False 
-                batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
+                 opt.fine_sampling = False 
+                 batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
             else:
                 opt.fine_sampling = True
                 batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
 
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
             if loss > 0.5:
-                printarr(batch_pred, batch_rays)
+                print(opt.fine_sampling)
+                printarr(batch_pred, batch_rays, batch_rgb)
                 exit()
+                
             loss.backward()
             optimizer.step()
 
@@ -69,8 +72,7 @@ def train_one_epoch(loader, model, optimizer, opt):
                     gt = img[:, :, :, 6:].to(opt.device)[0]
                     opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
                     opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
-
-        
+    
             pbar.set_description(f"loss={loss:.4f}")
             pbar.update(1)
 
