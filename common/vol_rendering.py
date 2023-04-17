@@ -14,8 +14,8 @@ def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=N
     imgs: [b, h, w, 3]
     """
     cam_rays = rays.reshape(rays.shape[0], 2, 3)
-    rgba, weights, samples = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
-    return rgba
+    rgba, weights, samples, density = expected_colour(model, cam_rays, t_n, t_f, n_samples, opt=opt)
+    return rgba, density
 
 
 def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=None, w=None, focal=None, c2w=None, opt=None):
@@ -46,7 +46,7 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
         # two rows at a time to avoid OOM
         for i in range(cam_rays_i.shape[0]):
             cam_rays_i_batch = cam_rays_i[i, ...].reshape(-1, 2, 3)
-            rgba, weights, samples = expected_colour(model, cam_rays_i_batch, t_n, t_f, n_samples, opt)
+            rgba, weights, samples, density = expected_colour(model, cam_rays_i_batch, t_n, t_f, n_samples, opt)
             # assign colour to image
             imgs[cam, i, :, :] = rgba.reshape(w, 4)
     return imgs
@@ -170,7 +170,7 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
         
         # np.save('./final_output.npy', output.detach().cpu().numpy())
         #exit()
-        return output, final_weights, samples
+        return output, final_weights, samples, density
     
 def inverse_transform_sampling(coarse_samples_mid, weights, opt):
     '''

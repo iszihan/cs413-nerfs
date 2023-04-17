@@ -24,7 +24,7 @@ def main():
     parser.add_argument('--epoch', type=int, default=3, help="epoch size")
     parser.add_argument('--total_steps', type=int, default=200000, help="total steps")
     parser.add_argument('--outdir', type=str, default='./output/lego/', help="output directory")
-    parser.add_argument('--expname', type=str, default='trial', help="experiment name")
+    parser.add_argument('--expname', type=str, default='occ_reg', help="experiment name")
     parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray for stratefied sampling')
     parser.add_argument('--n_importance', type=int, default=128, help='number of points sampled along a ray for importance sampling')
     parser.add_argument('--iter_center', type=int, default=500, help='number of iterations for center cropping')
@@ -36,6 +36,8 @@ def main():
     parser.add_argument('--freq_mask', type=str2bool, default=False, help='FREENeRF frequency regularization.')
     parser.add_argument('--freq_reg_steps', type=int, default=160000, help='FREENeRF frequency regularization steps \
                          ( 0.8 * total steps = 0.8 * 200000).')
+    parser.add_argument('--occ_reg_weight', type=float, default=0.2, help='occlusion regularization weight')
+    parser.add_argument('--occ_index', type=int, default=10, help='occlusion reg indices with weight 1 upto occ_index')
 
     opt = parser.parse_args()
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
