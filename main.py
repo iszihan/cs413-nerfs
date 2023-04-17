@@ -16,10 +16,13 @@ from common.util import str2bool
 
 def main():
     parser = argparse.ArgumentParser()
+    
+    parser.add_argument('--dataset', type=str, default='train', help='dataset', choices=['train', 'test', 'few shot'])
     parser.add_argument('--op', type=str, default='train', help='operation', choices=['train', 'test'])
     parser.add_argument('--batch_rays', type=int, default=200, help="ray batch size")
     parser.add_argument('--batch_imgs', type=int, default=1, help="image batch size")
     parser.add_argument('--epoch', type=int, default=3, help="epoch size")
+    parser.add_argument('--total_steps', type=int, default=200000, help="total steps")
     parser.add_argument('--outdir', type=str, default='./output/lego/', help="output directory")
     parser.add_argument('--expname', type=str, default='trial', help="experiment name")
     parser.add_argument('--n_samples', type=int, default=64, help='number of point samples along a ray for stratefied sampling')
@@ -30,14 +33,18 @@ def main():
 
     # regularization 
     parser.add_argument('--freq_mask', type=str2bool, default=False, help='FREENeRF frequency regularization.')
-    parser.add_argument('--freq_reg_steps', type=int, default=190560, help='FREENeRF frequency regularization steps \
-                         ( 0.8 * total steps of 3 epochs = 0.8 * 238200).')
+    parser.add_argument('--freq_reg_steps', type=int, default=160000, help='FREENeRF frequency regularization steps \
+                         ( 0.8 * total steps = 0.8 * 200000).')
 
     opt = parser.parse_args()
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # some config bindings 
+    if opt.op == 'test': opt.dataset = 'test'
+    if opt.freq_mask: opt.dataset = 'few shot'
     
-    # Construct dataset
-    dataset = NerfDataset(dataset='blender', mode=opt.op)
+    # Construct dataset 
+    dataset = NerfDataset(dataset='blender', mode=opt.dataset)
     opt.h, opt.w, opt.focal, opt.near, opt.far = dataset.getConstants()
 
     # Construct dataloader for coarse training

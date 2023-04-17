@@ -31,6 +31,11 @@ class NerfDataset():
     def get_blender_dataset(self, basedir, half_res=True):
         data = {}
         categories = ['train', 'val', 'test']
+
+        few_shot_indices = ['1', '7', '10', '13', '15']
+        few_shot_imgs = [] 
+        few_shot_poses = []
+        
         for c in categories:
             with open(os.path.join(basedir, f'transforms_{c}.json'),'r') as fp:
                 data[c] = json.load(fp)
@@ -42,14 +47,27 @@ class NerfDataset():
             poses = []
             for f in d['frames']:
                 filename = os.path.join(basedir, f['file_path'] + '.png')
-                imgs.append(imageio.imread(filename))
-                poses.append(np.array(f['transform_matrix']))
+                img = imageio.imread(filename)
+                pose = np.array(f['transform_matrix'])
+                if c == 'train' and f['file_path'].split('_')[-1].split('.')[0] in few_shot_indices:
+                    few_shot_imgs.append(img)
+                    few_shot_poses.append(pose)
+                imgs.append(img)
+                poses.append(pose)
             imgs = (np.array(imgs) / 255.).astype(np.float32)
             #use white background
             imgs = imgs[...,:3]*imgs[...,-1:] + (1.-imgs[...,-1:])
             poses = np.array(poses).astype(np.float32)
             allimgs[c] = imgs 
             allposes[c] = poses
+        
+        few_shot_imgs = (np.array(few_shot_imgs) / 255.).astype(np.float32)
+        #use white background
+        few_shot_imgs = few_shot_imgs[...,:3]*few_shot_imgs[...,-1:] + (1.-few_shot_imgs[...,-1:])
+        few_shot_poses = np.array(few_shot_poses).astype(np.float32)
+        allimgs['few shot'] = few_shot_imgs 
+        allposes['few shot'] = few_shot_poses
+        
         h,w = allimgs[categories[0]][0].shape[:2]
         camera_angle_x = float(d['camera_angle_x'])
         focal = .5 * w / np.tan(.5 * camera_angle_x)
