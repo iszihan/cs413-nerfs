@@ -114,7 +114,7 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
         colour_pred = torch.sum(final_weights[..., None].repeat(1, 1, 3)* rgb, dim=1)
         alpha = alphas[:, -1]
         output = torch.cat([colour_pred.reshape(-1, 3), alpha.reshape(-1).unsqueeze(1)], dim=1)
-        return output, final_weights, samples
+        return output, final_weights, samples, density
     else:
         # fine sampling 
         samples_mid = 0.5 * (samples[:, 1:] + samples[:, :-1])

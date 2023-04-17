@@ -53,8 +53,9 @@ def train_one_epoch(loader, model, optimizer, opt):
                 opt.fine_sampling = True
                 batch_pred, density = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
 
-            l = l(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)#torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            l.backward()
+            #l = l(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)
+            loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
+            loss.backward()
             optimizer.step()
 
             if i_batch % 10 == 0:
