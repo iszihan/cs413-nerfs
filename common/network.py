@@ -2,6 +2,14 @@ import torch.nn as nn
 import torch
 
 """neural network building blocks, positional encoding"""
+def create_freq_mask(l, t, T):
+    freq_mask = torch.zeros(l)
+    ptr = l / 3 * t / T + 1 
+    ptr = ptr if ptr < l / 3 else l / 3 
+    int_ptr = int(ptr)
+    freq_mask[:int_ptr * 3] = 1.0 
+    freq_mask[int_ptr * 3: int_ptr * 3 + 3] = (ptr - int_ptr)
+    return torch.clip(freq_mask, 1e-8, 1-1e-8)
 
 class PositionalEncoding(nn.Module):
     """Positional encoding for 3D points"""

@@ -3,8 +3,6 @@
     Selena.
     common/utils.py or common/rays.py will have the transformation
 """
-
-from common.util import spherical_poses
 from common.rays import get_rays
 import os 
 import json 

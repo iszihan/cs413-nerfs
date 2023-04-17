@@ -6,6 +6,7 @@ from common.vol_rendering import volumetric_rendering_per_ray as render_ray
 import numpy as np
 import torch 
 import tqdm 
+from common.network import create_freq_mask
 from common.util import writable_image, printarr
 
 def train_one_epoch(loader, model, optimizer, opt):
@@ -65,9 +66,11 @@ def train_one_epoch(loader, model, optimizer, opt):
                     gt = img[:, :, :, 6:].to(opt.device)[0]
                     opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
                     opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
-        
-                #save_checkpoint(model, optimizer, opt.cur_epoch, opt)
-                #print(f'saved checkpoint at global step {opt.global_step}')
+
+            if opt.global_step % 10000 == 0:
+                save_checkpoint(model, optimizer, opt.cur_epoch, opt)
+                print(f'saved checkpoint at global step {opt.global_step}')
+                
             pbar.set_description(f"loss={loss:.4f}")
             pbar.update(1)
 

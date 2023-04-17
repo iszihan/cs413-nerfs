@@ -11,6 +11,7 @@ from common.vol_rendering import volumetric_rendering_per_image as render
 from torchvision.utils import save_image
 import click 
 import argparse
+from common.util import str2bool
 
 
 def main():
@@ -26,6 +27,12 @@ def main():
     parser.add_argument('--iter_center', type=int, default=500, help='number of iterations for center cropping')
     parser.add_argument('--iter_coarse', type=int, default=800, help='number of iterations for coarse training')
     parser.add_argument('--checkpoint', type=str, default=None, help='checkpoint path')
+
+    # regularization 
+    parser.add_argument('--freq_mask', type=str2bool, default=False, help='FREENeRF frequency regularization.')
+    parser.add_argument('--freq_reg_steps', type=int, default=190560, help='FREENeRF frequency regularization steps \
+                         ( 0.8 * total steps of 3 epochs = 0.8 * 238200).')
+
     opt = parser.parse_args()
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     

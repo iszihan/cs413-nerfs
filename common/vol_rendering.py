@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 import nerf.nerf as nerf
 import common.rays as rays_module
+from common.network import create_freq_mask
 from common.util import printarr
 
 def volumetric_rendering_per_ray(model, t_n, t_f, n_samples=10, rays=None, opt=None):
@@ -82,6 +83,14 @@ def expected_colour(model, rays, t_n, t_f, n_samples, opt=None):
     
     # positional encoding
     encoded_pts, encoded_views = model.module.encode_input(input) #8000, 60; 8000, 24
+    if opt.freq_mask:
+        pts_freq_mask = create_freq_mask(encoded_pts.shape[1], opt.global_step, opt.freq_reg_steps)
+        views_freq_mask = create_freq_mask(encoded_views.shape[1], opt.global_step, opt.freq_reg_steps)
+        pts_freq_mask = pts_freq_mask.unsqueeze(0).tile(encoded_pts.shape[0], 1).to(opt.device)
+        views_freq_mask = views_freq_mask.unsqueeze(0).tile(encoded_pts.shape[0], 1).to(opt.device)
+        encoded_pts = encoded_pts * pts_freq_mask
+        encoded_views = encoded_views * views_freq_mask
+
     input = torch.cat([encoded_pts, encoded_views], dim=1) #8000, 84
     output = model(input.reshape(rays.shape[0], n_samples, -1).float())# [n_rays, n_samples, 4]
 

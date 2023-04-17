@@ -1,6 +1,19 @@
-""" axis transformation, rotation, ..., any other utils"""
+""" utils """ 
+import argparse
 import torch 
 import inspect
+# common utils 
+def str2bool(v):
+    '''str2bool type for argparser'''
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
 # torch utils 
 def printarr(*arrs, float_width=6):
     """
@@ -128,7 +141,10 @@ def printarr(*arrs, float_width=6):
     finally:
         del frame
 
+def toNP(x):
+    return x.detach().to(torch.device('cpu')).numpy()
 
+# image utils 
 def writable_image(img):
     img_min = torch.min(img)
     img_max = torch.max(img)
@@ -136,9 +152,3 @@ def writable_image(img):
     #img = (img-lo) * (255 / (hi-lo))
     img = torch.round(img).clip(0,255).to(torch.uint8)
     return img
-
-def toNP(x):
-    return x.detach().to(torch.device('cpu')).numpy()
-
-def spherical_poses():
-    return None 
