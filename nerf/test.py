@@ -47,11 +47,13 @@ def test(dataloader, model, opt):
     mean_psnr = torch.mean(psnrs)
     mean_lpips = torch.mean(lpipss)
     
-    ret['mean psnr'] = mean_psnr
-    ret['mean lpips'] = mean_lpips
-    ret['psnrs'] = psnrs
-    ret['lpipss'] = lpipss
+    ret['mean psnr'] = mean_psnr.cpu().numpy()
+    ret['mean lpips'] = mean_lpips.cpu().numpy()
+    ret['psnrs'] = psnrs.cpu().numpy()
+    ret['lpipss'] = lpipss.cpu().numpy()
     
-    # write result to json 
-    with open(os.path.join(opt.outdir, 'test_results.json'), 'w') as f:
-        json.dump(ret, f)
+    # write results
+    np.save(f'{opt.outdir}/{opt.expname}/psnrs.npy', ret['psnrs'])
+    np.save(f'{opt.outdir}/{opt.expname}/lpipss.npy', ret['lpipss'])
+    np.save(f'{opt.outdir}/{opt.expname}/psnr.npy', ret['mean psnr'])
+    np.save(f'{opt.outdir}/{opt.expname}/lpips.npy', ret['mean lpips'])
