@@ -35,7 +35,7 @@ def volumetric_rendering_per_image(model, t_n, t_f, n_samples=10, rays=None, h=N
         h = rays.shape[1]
         w = rays.shape[2]
 
-    imgs = torch.zeros((cam_rays.shape[0], h, w, 4))
+    imgs = torch.zeros((cam_rays.shape[0], h, w, 4)).to('cuda')
 
     # get expected colour for each ray for each camera
     for cam in range(cam_rays.shape[0]):

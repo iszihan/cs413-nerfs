@@ -8,14 +8,12 @@ import torch
 import tqdm 
 from common.util import writable_image, printarr
 
-
 def train_one_epoch(loader, model, optimizer, opt):
-    
     
     for i, img in enumerate(loader):
         nb, h, w = img.shape[:3]
 
-        #center cropping for first 500 images 
+        # center cropping for first 500 images 
         if opt.global_step < opt.iter_center and h>256 and w>256:
             # center cropping 
             dh = int(h//2 * 0.5)
@@ -53,11 +51,6 @@ def train_one_epoch(loader, model, optimizer, opt):
                 batch_pred = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
 
             loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            if loss > 0.5:
-                print(opt.fine_sampling)
-                printarr(batch_pred, batch_rays, batch_rgb)
-                exit()
-                
             loss.backward()
             optimizer.step()
 
@@ -72,11 +65,14 @@ def train_one_epoch(loader, model, optimizer, opt):
                     gt = img[:, :, :, 6:].to(opt.device)[0]
                     opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
                     opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
-    
+        
+                #save_checkpoint(model, optimizer, opt.cur_epoch, opt)
+                #print(f'saved checkpoint at global step {opt.global_step}')
             pbar.set_description(f"loss={loss:.4f}")
             pbar.update(1)
 
 def train(train_dataloader, model, optimizer, opt):
+    
     # on keyboar interrupt, save model
     try:
         model.train()
@@ -85,8 +81,9 @@ def train(train_dataloader, model, optimizer, opt):
         opt.global_step = 0
         # use tqdm to show progress bar
         for i_epoch in range(opt.epoch):
+            opt.cur_epoch = i_epoch
             train_one_epoch(train_dataloader, model, optimizer, opt)
-            if i_epoch % 25 == 0 or i_epoch == opt.epoch - 1:
+            if i_epoch % 1 == 0 or i_epoch == opt.epoch - 1:
                 save_checkpoint(model, optimizer, i_epoch, opt)
                 print(f'saved checkpoint at epoch {i_epoch} and global step {opt.global_step}')
 
@@ -103,4 +100,4 @@ def save_checkpoint(model, optimizer, epoch, opt):
         'global_step': opt.global_step,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        }, os.path.join(opt.outdir, opt.expname, 'checkpoint_{}.pt'.format(epoch)))
+        }, os.path.join(opt.outdir, opt.expname, f'checkpoint_e{epoch}_s{opt.global_step}.pt'))
