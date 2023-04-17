@@ -30,7 +30,8 @@ def main():
     parser.add_argument('--iter_center', type=int, default=500, help='number of iterations for center cropping')
     parser.add_argument('--iter_coarse', type=int, default=800, help='number of iterations for coarse training')
     parser.add_argument('--checkpoint', type=str, default=None, help='checkpoint path')
-
+    # test 
+    parser.add_argument('--save_img', type=str2bool, default=False, help='save image only during testing.')
     # regularization 
     parser.add_argument('--freq_mask', type=str2bool, default=False, help='FREENeRF frequency regularization.')
     parser.add_argument('--freq_reg_steps', type=int, default=160000, help='FREENeRF frequency regularization steps \

@@ -67,8 +67,8 @@ def train_one_epoch(loader, model, optimizer, opt):
                     opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
                     opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
 
-            if opt.global_step % 10000 == 0:
-                save_checkpoint(model, optimizer, opt.cur_epoch, opt)
+            if opt.global_step % 10000 == 0 or opt.global_step == opt.total_steps:
+                save_checkpoint(model, optimizer, opt.global_epoch, opt)
                 print(f'saved checkpoint at global step {opt.global_step}')
                 
             pbar.set_description(f"loss={loss:.4f}")
@@ -76,25 +76,24 @@ def train_one_epoch(loader, model, optimizer, opt):
 
 def train(train_dataloader, model, optimizer, opt):
     
-    # on keyboar interrupt, save model
+    # on keyboard interrupt, save model
     try:
         model.train()
         # logging
         opt.writer = tensorboardX.SummaryWriter(os.path.join(opt.outdir, opt.expname, 'logs'))
         opt.global_step = 0
-        # use tqdm to show progress bar
-        for i_epoch in range(opt.epoch):
-            opt.cur_epoch = i_epoch
+        opt.global_epoch = 0
+        while opt.global_step < opt.total_steps: 
             train_one_epoch(train_dataloader, model, optimizer, opt)
-            if i_epoch % 1 == 0 or i_epoch == opt.epoch - 1:
-                save_checkpoint(model, optimizer, i_epoch, opt)
-                print(f'saved checkpoint at epoch {i_epoch} and global step {opt.global_step}')
+            opt.global_epoch += 1
+            if opt.global_epoch % 1 == 0:
+                save_checkpoint(model, optimizer, opt.global_epoch, opt)
+                print(f'saved checkpoint at epoch {opt.global_epoch} and global step {opt.global_step}')
 
     except KeyboardInterrupt:
-        save_checkpoint(model, optimizer, i_epoch, opt)
+        save_checkpoint(model, optimizer, opt.global_epoch, opt)
         print('saved checkpoint at step {}'.format(opt.global_step))
         print('training interrupted')
-
 
 def save_checkpoint(model, optimizer, epoch, opt):
     # save model

@@ -2,6 +2,10 @@
 import argparse
 import torch 
 import inspect
+import PIL.Image 
+import numpy as np 
+
+
 # common utils 
 def str2bool(v):
     '''str2bool type for argparser'''
@@ -145,6 +149,17 @@ def toNP(x):
     return x.detach().to(torch.device('cpu')).numpy()
 
 # image utils 
+def save_image(img, fname):
+    if img.shape[0] == 3 or img.shape[0] == 4:
+        img = np.transpose(img,(1,2,0))
+    img = np.asarray(img, dtype=np.float32)
+    img_min = np.min(img)
+    img_max = np.max(img)
+    img = (img - img_min) * (255 / (img_max - img_min))
+    img = np.rint(img).clip(0,255).astype(np.uint8)
+    if not fname is None:
+        PIL.Image.fromarray(img[:,:,:3], 'RGB').save(fname)
+
 def writable_image(img):
     img_min = torch.min(img)
     img_max = torch.max(img)
