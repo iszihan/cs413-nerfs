@@ -9,14 +9,16 @@ import json
 import cv2
 import imageio
 import torch
-import numpy as np 
+import numpy as np
+from data.llff import load_llff_data
+
 class NerfDataset():
     def __init__(self, dataset='blender', mode='train'):
         self.mode = mode
         self.dataset = dataset 
         if dataset=='blender':
             # referencing https://github.com/yenchenlin/nerf-pytorch/blob/223fe62d87d641e2bb0fb5bdbbcb6dad5efb2af3/run_nerf.py
-            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./dataset/nerf_synthetic/lego')
+            self.imgs, self.poses, self.h, self.w, self.f = self.get_blender_dataset('./data/nerf_synthetic/lego')
             # self.poses: 100,4,4
             # Construct Intrinsic 
             self.K = np.array([
@@ -26,7 +28,14 @@ class NerfDataset():
             self.near = 2
             self.far = 6
         
-        # self.rays_rgb = {k: get_rays(self.h, self.w, self.K, self.poses[k], self.imgs[k]) for k in self.imgs}
+        elif dataset =='llff':
+            self.imgs, self.poses, bds, hwf = self.get_llff_data('./data/nerf_llff_data/fern')
+            self.h, self.w, self.f = hwf
+            self.near, self.far = bds
+            self.K = np.array([
+                            [self.f, 0, 0],
+                            [0, self.f, 0],
+                            [0, 0, 1]])
 
     def get_blender_dataset(self, basedir, half_res=True):
         data = {}
@@ -84,6 +93,24 @@ class NerfDataset():
                 imgs_half_res[c] = np.array(imgs_half_res[c])
             allimgs = imgs_half_res
         return allimgs, allposes, h, w, focal
+
+    def get_llff_data(self, basedir, factor=8):
+        imgs, poses, bds, i_test = load_llff_data(basedir, factor)
+
+        #use white background
+        imgs = imgs[...,:3]*imgs[...,-1:] + (1.-imgs[...,-1:])
+
+        hwf = poses[0, :3, -1]
+        poses = poses[:, :3, :4]
+
+        allimgs = {}
+        allposes = {}
+        allimgs['test'] = np.expand_dims(imgs[i_test, ...], 0)
+        allposes['test'] = np.expand_dims(poses[i_test, ...], 0)
+        allimgs['train'] = np.delete(imgs, i_test, 0)
+        allposes['train'] = np.delete(poses, i_test, 0)
+
+        return allimgs, allposes, bds, hwf
 
     def __len__(self):
         return len(self.imgs[self.mode])

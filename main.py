@@ -40,6 +40,7 @@ def main():
                          ( 0.8 * total steps = 0.8 * 200000).')
     parser.add_argument('--occ_reg_weight', type=float, default=0.2, help='occlusion regularization weight')
     parser.add_argument('--occ_index', type=int, default=10, help='occlusion reg indices with weight 1 upto occ_index')
+    parser.add_argument('--dataset_name', type=str, default='llff', help='dataset name')
 
     opt = parser.parse_args()
     opt.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -49,7 +50,7 @@ def main():
     if opt.freq_mask: opt.dataset = 'few shot'
     
     # Construct dataset 
-    dataset = NerfDataset(dataset='blender', mode=opt.dataset)
+    dataset = NerfDataset(dataset=opt.dataset_name, mode=opt.dataset)
     opt.h, opt.w, opt.focal, opt.near, opt.far = dataset.getConstants()
 
     # Construct dataloader for coarse training

@@ -3,7 +3,7 @@ import tensorboardX
 import os 
 from common.vol_rendering import volumetric_rendering_per_image as render_image
 from common.vol_rendering import volumetric_rendering_per_ray as render_ray
-from common.losses import loss
+from common.losses import loss as loss_fn
 import numpy as np
 import torch 
 import tqdm 
@@ -13,9 +13,9 @@ from common.util import writable_image, printarr
 def train_one_epoch(loader, model, optimizer, opt):
     
     if opt.global_step==0:
-        opt.pbar = tqdm.tqdm(total=opt.total_steps, 
+        opt.pbar = tqdm.tqdm(total=opt.total_steps,
                              bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
-    
+
     for i, img in enumerate(loader):
         nb, h, w = img.shape[:3]
 
@@ -53,8 +53,7 @@ def train_one_epoch(loader, model, optimizer, opt):
                 opt.fine_sampling = True
                 batch_pred, density = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
 
-            #l = l(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)
-            loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
+            loss = loss_fn(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)
             loss.backward()
             optimizer.step()
 
