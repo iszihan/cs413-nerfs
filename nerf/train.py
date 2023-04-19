@@ -12,6 +12,10 @@ from common.util import writable_image, printarr
 
 def train_one_epoch(loader, model, optimizer, opt):
     
+    if opt.global_step==0:
+        opt.pbar = tqdm.tqdm(total=opt.total_steps, 
+                             bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
+    
     for i, img in enumerate(loader):
         nb, h, w = img.shape[:3]
 
@@ -32,9 +36,6 @@ def train_one_epoch(loader, model, optimizer, opt):
         ray_indices = np.array(range(coords.shape[0]))
         np.random.shuffle(ray_indices)
         n_batches = n_rays // opt.batch_rays
-        if i==0:
-            pbar = tqdm.tqdm(total=len(loader) * n_batches, 
-                             bar_format='{desc}: {percentage:3.0f}% {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]')
         
         for i_batch in range(n_batches):
             optimizer.zero_grad()
@@ -52,28 +53,30 @@ def train_one_epoch(loader, model, optimizer, opt):
                 opt.fine_sampling = True
                 batch_pred, density = render_ray(model, opt.near, opt.far, 64, batch_rays, opt) #nb,4
 
-            l = l(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)#torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
-            l.backward()
+            #l = l(batch_pred[:, :3], batch_rgb, density, opt.occ_reg_weight, opt.occ_index)
+            loss = torch.mean((batch_pred[:, :3] - batch_rgb) ** 2)
+            loss.backward()
             optimizer.step()
 
             if i_batch % 10 == 0:
                 opt.writer.add_scalar('loss', loss, opt.global_step)
             
             # log image
-            if i_batch % 100 == 0:
-                with torch.no_grad():
-                    rays = img[:1, :, :, :6].to(opt.device)
-                    pred = render_image(model, opt.near, opt.far, 64, rays, opt=opt)[0]
-                    gt = img[:, :, :, 6:].to(opt.device)[0]
-                    opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
-                    opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
+            if opt.log_img:
+                if i_batch % 100 == 0:
+                    with torch.no_grad():
+                        rays = img[:1, :, :, :6].to(opt.device)
+                        pred = render_image(model, opt.near, opt.far, 64, rays, opt=opt)[0]
+                        gt = img[:, :, :, 6:].to(opt.device)[0]
+                        opt.writer.add_image('pred', writable_image(pred.permute(2, 0, 1)), opt.global_step)
+                        opt.writer.add_image('gt', writable_image(gt.permute(2, 0, 1)), opt.global_step)
 
             if opt.global_step % 10000 == 0 or opt.global_step == opt.total_steps:
                 save_checkpoint(model, optimizer, opt.global_epoch, opt)
                 print(f'saved checkpoint at global step {opt.global_step}')
                 
-            pbar.set_description(f"loss={loss:.4f}")
-            pbar.update(1)
+            opt.pbar.set_description(f"loss={loss:.4f}")
+            opt.pbar.update(1)
 
 def train(train_dataloader, model, optimizer, opt):
     
